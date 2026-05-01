@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
+  Injectable,
+  BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 // @ts-ignore
 const PDFDocument = require('pdfkit');
@@ -10,12 +10,14 @@ import { Model, Types } from 'mongoose';
 import { CreateSessionDto } from './dto/create-session.dto';
 import { UpdateSessionDto } from './dto/update-session.dto';
 import { Session, SessionDocument } from './schemas/session.schema';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SessionsService {
   constructor(
     @InjectModel(Session.name)
     private readonly sessionModel: Model<SessionDocument>,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ── List (paginated) ───────────────────────────────────────
@@ -147,6 +149,31 @@ export class SessionsService {
     const session = await this.findOne(userId, id);
     if (!session.markers) session.markers = [];
     session.markers.push({ timestamp: new Date(), label });
+    
+    // Check if label contains keywords that imply an issue
+    const lowerLabel = label.toLowerCase();
+    let type = 'info';
+    let title = 'New Timeline Marker';
+    if (lowerLabel.includes('attention drop') || lowerLabel.includes('low')) {
+      type = 'warning';
+      title = 'Attention Alert';
+    } else if (lowerLabel.includes('disconnected') || lowerLabel.includes('error') || lowerLabel.includes('distracted')) {
+      type = 'error';
+      title = 'Critical Alert';
+    } else if (lowerLabel.includes('excellent') || lowerLabel.includes('high')) {
+      type = 'success';
+      title = 'Positive Milestone';
+    }
+    
+    // Create notification
+    await this.notificationsService.createNotification(
+      userId,
+      title,
+      `Session "${session.title}": ${label}`,
+      type,
+      `/dashboard/live`
+    );
+
     return session.save();
   }
 

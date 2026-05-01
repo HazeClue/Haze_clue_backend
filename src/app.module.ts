@@ -10,6 +10,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { SupportModule } from './support/support.module';
 import { UsersModule } from './users/users.module';
 import { GatewayModule } from './gateway/gateway.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
