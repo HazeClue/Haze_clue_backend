@@ -107,4 +107,17 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     this.activeIntervals.set(sessionId, interval);
   }
+
+  // Helper method to emit alert to a session room
+  broadcastAlert(sessionId: string, message: string) {
+    this.server.to(`session_${sessionId}`).emit('class_alert', {
+      timestamp: new Date().toISOString(),
+      message,
+    });
+    // For clients connected directly to sessionId room (EegGateway compat)
+    this.server.to(sessionId).emit('class_alert', {
+      timestamp: new Date().toISOString(),
+      message,
+    });
+  }
 }

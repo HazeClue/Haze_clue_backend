@@ -12,10 +12,15 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ReportsService } from './reports.service';
 import { CreateReportDto } from './dto/create-report.dto';
 
+import { SessionsService } from '../sessions/sessions.service';
+
 @Controller('reports')
 @UseGuards(JwtAuthGuard)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly sessionsService: SessionsService,
+  ) {}
 
   @Get()
   async findAll(
@@ -27,21 +32,27 @@ export class ReportsController {
     const p = Math.max(1, parseInt(page || '1', 10) || 1);
     const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
 
-    const result = await this.reportsService.findAll(userId, p, l, sessionId);
+    // Fetch all completed sessions as "reports"
+    const result = await this.sessionsService.findAll(userId, p, l, 'completed');
     
+    // If sessionId filter provided, filter locally for simplicity (or we could update SessionsService)
+    let sessions = result.data;
+    if (sessionId) {
+      sessions = sessions.filter(s => s._id.toString() === sessionId);
+    }
+
     return {
-      data: result.data.map((r: any) => ({
-        id: r.id,
-        sessionId: r.session?._id || r.session,
-        sessionName: r.session?.name || '',
+      data: sessions.map((s: any) => ({
+        id: s._id,
+        sessionId: s._id,
+        sessionName: s.title || s.name || 'Untitled Session',
         type: 'session_summary',
         status: 'ready',
-        createdAt: r.generatedAt,
-        downloadUrl: `/api/reports/${r.id}/export`,
+        createdAt: s.endedAt || s.updatedAt || s.createdAt,
       })),
-      total: result.total,
-      page: result.page,
-      limit: result.limit,
+      total: result.meta.total,
+      page: result.meta.current_page,
+      limit: result.meta.per_page,
     };
   }
 

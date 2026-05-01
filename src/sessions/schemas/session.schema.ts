@@ -43,6 +43,12 @@ export class Session {
   @Prop()
   notes?: string;
 
+  @Prop({ type: [{ timestamp: { type: Date, required: true }, label: { type: String, required: true } }], default: [] })
+  markers: Array<{ timestamp: Date; label: string }>;
+
+  @Prop({ default: false })
+  isPaused: boolean;
+
   @Prop()
   startedAt?: Date;
 

@@ -54,11 +54,27 @@ export class EegGateway
   @SubscribeMessage('action')
   handleAction(client: Socket, payload: any): void {
     const sessionId = client.handshake.query.sessionId as string;
-    if (payload.action === 'end' && sessionId) {
+    if (!sessionId) return;
+
+    if (payload.action === 'end') {
       console.log(`Session ${sessionId} ended by client ${client.id}`);
       this.stopSimulation(sessionId);
       this.server.to(sessionId).emit('session_ended', { sessionId });
+    } else if (payload.action === 'pause') {
+      console.log(`Session ${sessionId} paused by client ${client.id}`);
+      this.stopSimulation(sessionId);
+    } else if (payload.action === 'resume') {
+      console.log(`Session ${sessionId} resumed by client ${client.id}`);
+      this.startSimulation(sessionId);
     }
+  }
+
+  // Helper method to emit alert to a session room
+  broadcastAlert(sessionId: string, message: string) {
+    this.server.to(sessionId).emit('class_alert', {
+      timestamp: new Date().toISOString(),
+      message,
+    });
   }
 
   // Helper method to simulate incoming EEG data for a session
