@@ -39,6 +39,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     LookupsModule,
     SupportModule,
     GatewayModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
@@ -11,7 +12,10 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {
@@ -59,7 +63,7 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: any, @Res() res: any) {
     const token = await this.authService.validateOAuthLogin(req.user, 'google');
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3003');
     res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
   }
 
@@ -73,7 +77,7 @@ export class AuthController {
   @UseGuards(AuthGuard('facebook'))
   async facebookAuthRedirect(@Req() req: any, @Res() res: any) {
     const token = await this.authService.validateOAuthLogin(req.user, 'facebook');
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3003');
     res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
   }
 }

@@ -97,10 +97,10 @@ export class AuthService {
     } as any);
 
     // TODO: integrate email service to send OTP
-    // For dev/testing, return the OTP in the response
+    // For dev/testing, log OTP to console
+    console.log(`[DEV] OTP for ${dto.email}: ${otp}`);
     return {
       message: 'OTP sent successfully',
-      otp, // remove in production
     };
   }
 
