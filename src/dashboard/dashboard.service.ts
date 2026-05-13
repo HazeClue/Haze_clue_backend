@@ -32,18 +32,18 @@ export class DashboardService {
     // For now, we simulate the aggregation since telemetry array isn't fully persisted per session yet in the schema.
     // If telemetry exists, we'd average it. Since we generate mock data in sessions service, we'll assign realistic scores based on markers.
     
-    let totalAvgAttention = 0;
-    const attentionTrends = [];
+    let totalAvgAttention: any = 0;
+    const attentionTrends: any[] = [];
     
     let highCount = 0;
     let mediumCount = 0;
     let lowCount = 0;
 
-    const recentActivity = [];
+    const recentActivity: any[] = [];
 
     // Map the most recent sessions to recentActivity
     const recentSess = await this.sessionModel.find({ user: userObjId }).sort({ createdAt: -1 }).limit(5).exec();
-    recentSess.forEach((s) => {
+    recentSess.forEach((s: any) => {
       recentActivity.push({
         id: s._id.toString(),
         type: 'session_created',
@@ -54,7 +54,7 @@ export class DashboardService {
     });
 
     if (completedSessions.length > 0) {
-      completedSessions.forEach((session) => {
+      completedSessions.forEach((session: any) => {
         // Mocking a persisted average score between 60 and 95 for the session based on its length/markers
         const simulatedScore = 60 + ((session.title.length * 7) % 35);
         totalAvgAttention += simulatedScore;
