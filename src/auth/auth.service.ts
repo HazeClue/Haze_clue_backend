@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
+import * as nodemailer from 'nodemailer';
 import { UsersService } from '../users/users.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,10 +21,22 @@ const OTP_EXPIRY_MINUTES = 10;
 
 @Injectable()
 export class AuthService {
+  private transporter: nodemailer.Transporter;
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
 
   // ── Register ─────────────────────────────────────────────────
   async register(dto: RegisterDto) {
@@ -96,9 +109,24 @@ export class AuthService {
       otp: { code: otp, expiresAt },
     } as any);
 
-    // TODO: integrate email service to send OTP
-    // For dev/testing, log OTP to console
     console.log(`[DEV] OTP for ${dto.email}: ${otp}`);
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        await this.transporter.sendMail({
+          from: `"Haze Clue" <${process.env.SMTP_USER}>`,
+          to: user.email,
+          subject: 'Your Password Reset OTP - Haze Clue',
+          text: `Your OTP is ${otp}. It will expire in ${OTP_EXPIRY_MINUTES} minutes.`,
+          html: `<p>Your OTP is <b>${otp}</b>. It will expire in ${OTP_EXPIRY_MINUTES} minutes.</p>`,
+        });
+      } catch (error) {
+        console.error('Failed to send OTP email:', error);
+      }
+    } else {
+      console.warn('SMTP credentials not provided. OTP email not sent.');
+    }
+
     return {
       message: 'OTP sent successfully',
     };
@@ -198,7 +226,6 @@ export class AuthService {
   }
 
   private _generateOtp(): string {
-    // TODO: generate random OTP in production
-    return '111111';
+    return randomInt(100000, 999999).toString();
   }
 }
