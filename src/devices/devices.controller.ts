@@ -8,6 +8,7 @@ import {
     Param,
     Patch,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -23,9 +24,21 @@ export class DevicesController {
 
   // ── GET /devices ───────────────────────────────────────────
   @Get()
-  async findAll(@CurrentUser() userId: string) {
-    const devices = await this.devicesService.findAll(userId);
-    return devices.map((d) => d.toJSON());
+  async findAll(
+    @CurrentUser() userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    const p = Math.max(1, parseInt(page || '1', 10) || 1);
+    const l = Math.min(50, Math.max(1, parseInt(limit || '10', 10) || 10));
+
+    const result = await this.devicesService.findAll(userId, p, l, search);
+
+    return {
+      data: result.data.map((d) => d.toJSON()),
+      meta: result.meta,
+    };
   }
 
   // ── POST /devices ──────────────────────────────────────────

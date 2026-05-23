@@ -16,12 +16,50 @@ export class DevicesService {
     private readonly deviceModel: Model<DeviceDocument>,
   ) {}
 
-  // ── List user devices ──────────────────────────────────────
-  async findAll(userId: string): Promise<DeviceDocument[]> {
-    return this.deviceModel
-      .find({ user: new Types.ObjectId(userId) })
-      .sort({ createdAt: -1 })
-      .exec();
+  // ── List user devices (Paginated) ──────────────────────────
+  async findAll(
+    userId: string,
+    page = 1,
+    limit = 10,
+    search?: string,
+  ): Promise<{
+    data: DeviceDocument[];
+    meta: {
+      current_page: number;
+      last_page: number;
+      per_page: number;
+      total: number;
+    };
+  }> {
+    const skip = (page - 1) * limit;
+    const filter: any = { user: new Types.ObjectId(userId) };
+
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { serialNumber: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      this.deviceModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.deviceModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      data,
+      meta: {
+        current_page: page,
+        last_page: Math.ceil(total / limit) || 1,
+        per_page: limit,
+        total,
+      },
+    };
   }
 
   // ── Find one ───────────────────────────────────────────────
