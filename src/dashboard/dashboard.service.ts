@@ -1,14 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Session, SessionDocument } from '../sessions/schemas/session.schema';
+import { Telemetry, TelemetryDocument } from '../gateway/schemas/telemetry.schema';
 import { DevicesService } from '../devices/devices.service';
 import { SessionsService } from '../sessions/sessions.service';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectModel(Session.name) private sessionModel: Model<SessionDocument>,
+    @InjectModel(Telemetry.name) private telemetryModel: Model<TelemetryDocument>,
     private readonly sessionsService: SessionsService,
     private readonly devicesService: DevicesService,
   ) {}
@@ -28,10 +32,6 @@ export class DashboardService {
       status: 'completed',
     }).sort({ createdAt: 1 }).exec();
 
-    // 1. Avg Attention (using a mock random stat per session if actual attention telemetry isn't stored yet)
-    // For now, we simulate the aggregation since telemetry array isn't fully persisted per session yet in the schema.
-    // If telemetry exists, we'd average it. Since we generate mock data in sessions service, we'll assign realistic scores based on markers.
-    
     let totalAvgAttention: any = 0;
     const attentionTrends: any[] = [];
     
@@ -54,20 +54,38 @@ export class DashboardService {
     });
 
     if (completedSessions.length > 0) {
-      completedSessions.forEach((session: any) => {
-        // Mocking a persisted average score between 60 and 95 for the session based on its length/markers
-        const simulatedScore = 60 + ((session.title.length * 7) % 35);
-        totalAvgAttention += simulatedScore;
+      // Try to get real telemetry data for each session
+      for (const session of completedSessions) {
+        let avgScore: number;
+
+        // Check if real telemetry data exists for this session
+        const telemetryData = await this.telemetryModel
+          .find({ session: session._id })
+          .select('attention')
+          .exec();
+
+        if (telemetryData.length > 0) {
+          // Use real telemetry data
+          const sum = telemetryData.reduce((acc, t) => acc + t.attention, 0);
+          avgScore = Math.round(sum / telemetryData.length);
+          this.logger.debug(`Session ${session._id}: using real telemetry data (${telemetryData.length} points, avg=${avgScore})`);
+        } else {
+          // Fallback: simulate a score based on session characteristics
+          avgScore = 60 + ((session.title.length * 7) % 35);
+          this.logger.debug(`Session ${session._id}: no telemetry data, using simulated score (${avgScore})`);
+        }
+
+        totalAvgAttention += avgScore;
         
         attentionTrends.push({
-          date: session.createdAt.toISOString().split('T')[0],
-          avgAttention: simulatedScore,
+          date: (session as any).createdAt.toISOString().split('T')[0],
+          avgAttention: avgScore,
         });
 
-        if (simulatedScore >= 80) highCount++;
-        else if (simulatedScore >= 65) mediumCount++;
+        if (avgScore >= 80) highCount++;
+        else if (avgScore >= 65) mediumCount++;
         else lowCount++;
-      });
+      }
       
       totalAvgAttention = Math.round(totalAvgAttention / completedSessions.length);
     } else {

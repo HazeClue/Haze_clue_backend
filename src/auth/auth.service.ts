@@ -2,6 +2,7 @@ import {
    BadRequestException,
    ConflictException,
    Injectable,
+   Logger,
    UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -22,6 +23,7 @@ const OTP_EXPIRY_MINUTES = 10;
 @Injectable()
 export class AuthService {
   private transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(AuthService.name);
 
   constructor(
     private readonly usersService: UsersService,
@@ -109,7 +111,10 @@ export class AuthService {
       otp: { code: otp, expiresAt },
     } as any);
 
-    console.log(`[DEV] OTP for ${dto.email}: ${otp}`);
+    // Only log OTP in development for debugging
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.debug(`OTP for ${dto.email}: ${otp}`);
+    }
 
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
@@ -121,10 +126,10 @@ export class AuthService {
           html: `<p>Your OTP is <b>${otp}</b>. It will expire in ${OTP_EXPIRY_MINUTES} minutes.</p>`,
         });
       } catch (error) {
-        console.error('Failed to send OTP email:', error);
+        this.logger.error('Failed to send OTP email:', error);
       }
     } else {
-      console.warn('SMTP credentials not provided. OTP email not sent.');
+      this.logger.warn('SMTP credentials not provided. OTP email not sent.');
     }
 
     return {

@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Session } from './schemas/session.schema';
 import { SessionsService } from './sessions.service';
 
@@ -35,6 +36,11 @@ const mockSessionModel = {
   countDocuments: jest.fn(),
 };
 
+// Mock NotificationsService
+const mockNotificationsService = {
+  createNotification: jest.fn().mockResolvedValue({}),
+};
+
 describe('SessionsService', () => {
   let service: SessionsService;
 
@@ -45,6 +51,10 @@ describe('SessionsService', () => {
         {
           provide: getModelToken(Session.name),
           useValue: mockSessionModel,
+        },
+        {
+          provide: NotificationsService,
+          useValue: mockNotificationsService,
         },
       ],
     }).compile();

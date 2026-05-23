@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DevicesModule } from './devices/devices.module';
@@ -19,6 +21,25 @@ import { NotificationsModule } from './notifications/notifications.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // ── Rate Limiting (global) ─────────────────────────────────
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,   // 1 second window
+        limit: 3,    // max 3 requests per second
+      },
+      {
+        name: 'medium',
+        ttl: 10000,  // 10 second window
+        limit: 20,   // max 20 requests per 10 seconds
+      },
+      {
+        name: 'long',
+        ttl: 60000,  // 1 minute window
+        limit: 100,  // max 100 requests per minute
+      },
+    ]),
 
     // ── MongoDB Connection ─────────────────────────────────────
     MongooseModule.forRootAsync({
@@ -41,6 +62,14 @@ import { NotificationsModule } from './notifications/notifications.module';
     GatewayModule,
     NotificationsModule,
   ],
+  providers: [
+    // Apply rate limiting globally
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
+
 

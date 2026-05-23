@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -10,35 +11,42 @@ import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: process.env.CORS_ORIGINS
+      ? process.env.CORS_ORIGINS.split(',').map((o) => o.trim())
+      : ['http://localhost:3000', 'http://localhost:3003', 'https://hazeclue.netlify.app'],
+    credentials: true,
   },
 })
 export class EegGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() server: Server;
+  private readonly logger = new Logger(EegGateway.name);
   
   private simulationIntervals: Map<string, NodeJS.Timeout> = new Map();
 
   afterInit(server: Server) {
-    console.log('WebSocket Gateway initialized.');
+    this.logger.log('WebSocket Gateway initialized');
   }
 
   handleConnection(client: Socket) {
-    console.log(`Client connected: ${client.id}`);
+    this.logger.log(`Client connected: ${client.id}`);
     const sessionId = client.handshake.query.sessionId as string;
     
     if (sessionId) {
       client.join(sessionId);
-      console.log(`Client ${client.id} joined session ${sessionId}`);
+      this.logger.log(`Client ${client.id} joined session ${sessionId}`);
       
-      // For demonstration, start emitting simulated data to this room if not already emitting
-      this.startSimulation(sessionId);
+      // Only start simulation if USE_SIMULATION is enabled (default: true)
+      const useSimulation = process.env.USE_SIMULATION !== 'false';
+      if (useSimulation) {
+        this.startSimulation(sessionId);
+      }
     }
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Client disconnected: ${client.id}`);
+    this.logger.log(`Client disconnected: ${client.id}`);
     const sessionId = client.handshake.query.sessionId as string;
     if (sessionId) {
       client.leave(sessionId);
@@ -57,14 +65,14 @@ export class EegGateway
     if (!sessionId) return;
 
     if (payload.action === 'end') {
-      console.log(`Session ${sessionId} ended by client ${client.id}`);
+      this.logger.log(`Session ${sessionId} ended by client ${client.id}`);
       this.stopSimulation(sessionId);
       this.server.to(sessionId).emit('session_ended', { sessionId });
     } else if (payload.action === 'pause') {
-      console.log(`Session ${sessionId} paused by client ${client.id}`);
+      this.logger.log(`Session ${sessionId} paused by client ${client.id}`);
       this.stopSimulation(sessionId);
     } else if (payload.action === 'resume') {
-      console.log(`Session ${sessionId} resumed by client ${client.id}`);
+      this.logger.log(`Session ${sessionId} resumed by client ${client.id}`);
       this.startSimulation(sessionId);
     }
   }
@@ -81,7 +89,7 @@ export class EegGateway
   private startSimulation(sessionId: string) {
     if (this.simulationIntervals.has(sessionId)) return;
 
-    console.log(`Starting EEG simulation for session: ${sessionId}`);
+    this.logger.debug(`Starting EEG simulation for session: ${sessionId}`);
     const interval = setInterval(() => {
       const data = {
         type: 'attention_update',
@@ -120,7 +128,7 @@ export class EegGateway
 
   private stopSimulation(sessionId: string) {
     if (this.simulationIntervals.has(sessionId)) {
-      console.log(`Stopping EEG simulation for session: ${sessionId}`);
+      this.logger.debug(`Stopping EEG simulation for session: ${sessionId}`);
       clearInterval(this.simulationIntervals.get(sessionId));
       this.simulationIntervals.delete(sessionId);
     }

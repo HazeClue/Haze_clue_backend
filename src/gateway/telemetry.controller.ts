@@ -1,29 +1,64 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { EegGateway } from './eeg.gateway';
+import { Telemetry, TelemetryDocument } from './schemas/telemetry.schema';
 
 @Controller('telemetry')
 export class TelemetryController {
-  constructor(private readonly eegGateway: EegGateway) {}
+  private readonly logger = new Logger(TelemetryController.name);
+
+  constructor(
+    private readonly eegGateway: EegGateway,
+    @InjectModel(Telemetry.name) private readonly telemetryModel: Model<TelemetryDocument>,
+  ) {}
 
   @Post()
-  receiveTelemetryData(@Body() data: { deviceId: string; attention: number; meditation: number; delta?: number; theta?: number; alpha?: number; beta?: number; gamma?: number }) {
-    // Expected structure:
-    // {
-    //    "deviceId": "DEVICE-1234",
-    //    "attention": 85,
-    //    "meditation": 60,
-    //    "delta": 0.5, "theta": 0.4, ...
-    // }
-    
-    // Push the received data to all connected clients listening on this device's room
-    // For now, we broadcast to everyone or a specific device channel
-    this.eegGateway.server.emit('device:data', {
+  async receiveTelemetryData(
+    @Body() data: {
+      deviceId: string;
+      sessionId?: string;
+      attention: number;
+      meditation?: number;
+      delta?: number;
+      theta?: number;
+      alpha?: number;
+      beta?: number;
+      gamma?: number;
+    },
+  ) {
+    // 1. Persist the telemetry data point
+    const telemetryRecord = await this.telemetryModel.create({
+      deviceId: data.deviceId,
+      session: data.sessionId || undefined,
+      attention: data.attention,
+      meditation: data.meditation,
+      delta: data.delta,
+      theta: data.theta,
+      alpha: data.alpha,
+      beta: data.beta,
+      gamma: data.gamma,
+      recordedAt: new Date(),
+    });
+
+    this.logger.debug(`Telemetry received from device ${data.deviceId}: attention=${data.attention}`);
+
+    // 2. Broadcast to session-specific room if sessionId provided, otherwise to device channel
+    const payload = {
       deviceId: data.deviceId,
       attention: data.attention,
       meditation: data.meditation,
-      timestamp: new Date().toISOString()
-    });
+      timestamp: telemetryRecord.recordedAt.toISOString(),
+    };
 
-    return { success: true, message: 'Telemetry data broadcasted' };
+    if (data.sessionId) {
+      // Route to specific session room
+      this.eegGateway.server.to(data.sessionId).emit('device:data', payload);
+    } else {
+      // Fallback: broadcast to device-specific channel
+      this.eegGateway.server.emit(`device:${data.deviceId}`, payload);
+    }
+
+    return { success: true, message: 'Telemetry data received and broadcasted' };
   }
 }

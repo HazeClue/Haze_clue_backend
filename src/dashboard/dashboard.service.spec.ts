@@ -1,7 +1,31 @@
+import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DevicesService } from '../devices/devices.service';
 import { SessionsService } from '../sessions/sessions.service';
+import { Session } from '../sessions/schemas/session.schema';
+import { Telemetry } from '../gateway/schemas/telemetry.schema';
 import { DashboardService } from './dashboard.service';
+
+// Mock session model
+const mockSessionModel = {
+  find: jest.fn().mockReturnValue({
+    sort: jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue([]),
+      limit: jest.fn().mockReturnValue({
+        exec: jest.fn().mockResolvedValue([]),
+      }),
+    }),
+  }),
+};
+
+// Mock telemetry model
+const mockTelemetryModel = {
+  find: jest.fn().mockReturnValue({
+    select: jest.fn().mockReturnValue({
+      exec: jest.fn().mockResolvedValue([]),
+    }),
+  }),
+};
 
 describe('DashboardService', () => {
   let service: DashboardService;
@@ -22,6 +46,8 @@ describe('DashboardService', () => {
         DashboardService,
         { provide: SessionsService, useValue: sessionsService },
         { provide: DevicesService, useValue: devicesService },
+        { provide: getModelToken(Session.name), useValue: mockSessionModel },
+        { provide: getModelToken(Telemetry.name), useValue: mockTelemetryModel },
       ],
     }).compile();
 
@@ -41,13 +67,11 @@ describe('DashboardService', () => {
 
       const result = await service.getStats('507f1f77bcf86cd799439012');
 
-      expect(result).toEqual({
-        connectedDevices: 3,
-        totalSessions: 10,
-        activeSessions: 2,
-        avgAttention: null,
-        reportsGenerated: 0,
-      });
+      expect(result.connectedDevices).toBe(3);
+      expect(result.totalSessions).toBe(10);
+      expect(result.activeSessions).toBe(2);
+      expect(result.avgAttention).toBeNull();
+      expect(result.reportsGenerated).toBe(0);
     });
 
     it('should return zeros when empty', async () => {
