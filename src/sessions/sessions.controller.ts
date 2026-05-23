@@ -139,10 +139,22 @@ export class SessionsController {
     @Param('id') id: string,
     @Body() dto: SendAlertDto,
   ) {
-    // We can check if session exists/belongs to user first
     await this.sessionsService.findOne(userId, id);
     this.sessionsService.broadcastAlert(id, dto.message);
     return { success: true, message: 'Alert sent' };
+  }
+
+  // ── POST /sessions/:id/tick ────────────────────────────────
+  @Post(':id/tick')
+  @HttpCode(HttpStatus.OK)
+  async tickSimulation(
+    @CurrentUser() userId: string,
+    @Param('id') id: string,
+  ) {
+    // Allows the frontend to drive the simulation on serverless environments
+    await this.sessionsService.findOne(userId, id);
+    this.sessionsService.tickSimulation(id);
+    return { success: true };
   }
 
   // ── GET /sessions/:id/export/pdf ───────────────────────────

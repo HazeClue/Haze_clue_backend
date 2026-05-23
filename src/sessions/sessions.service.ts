@@ -15,8 +15,6 @@ import { PusherService } from '../pusher/pusher.service';
 
 @Injectable()
 export class SessionsService {
-  private activeIntervals = new Map<string, NodeJS.Timeout>();
-
   constructor(
     @InjectModel(Session.name)
     private readonly sessionModel: Model<SessionDocument>,
@@ -223,46 +221,44 @@ export class SessionsService {
   }
 
   // ── Simulation Logic ───────────────────────────────────────
+  // Note: On serverless environments (Vercel), intervals don't survive. 
+  // We use a tick mechanism driven by the frontend.
+  private elapsedMap = new Map<string, number>();
+
   startSimulationForSession(sessionId: string) {
-    if (this.activeIntervals.has(sessionId)) return;
-
-    let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 2;
-      
-      const payload = {
-        type: 'attention_update',
-        timestamp: new Date().toISOString(),
-        data: {
-          classAvgAttention: Math.floor(Math.random() * 20) + 70,
-          connectedDevices: 18,
-          totalDevices: 20,
-          duration: `${Math.floor(elapsed / 60).toString().padStart(2, '0')}:${(elapsed % 60).toString().padStart(2, '0')}`,
-          remainingTime: null,
-          engagementLevel: 'high',
-          perStudent: [
-            {
-              deviceId: 'dev123',
-              studentName: 'Student A',
-              attention: Math.floor(Math.random() * 20) + 70,
-            }
-          ]
-        }
-      };
-
-      this.pusherService.trigger(`session_${sessionId}`, 'attention_update', payload);
-
-    }, 2000);
-
-    this.activeIntervals.set(sessionId, interval);
+    this.elapsedMap.set(sessionId, 0);
   }
 
   stopSimulationForSession(sessionId: string) {
-    const interval = this.activeIntervals.get(sessionId);
-    if (interval) {
-      clearInterval(interval);
-      this.activeIntervals.delete(sessionId);
-    }
+    this.elapsedMap.delete(sessionId);
+  }
+
+  tickSimulation(sessionId: string) {
+    let elapsed = this.elapsedMap.get(sessionId) || 0;
+    elapsed += 2;
+    this.elapsedMap.set(sessionId, elapsed);
+
+    const payload = {
+      type: 'attention_update',
+      timestamp: new Date().toISOString(),
+      data: {
+        classAvgAttention: Math.floor(Math.random() * 20) + 70,
+        connectedDevices: 18,
+        totalDevices: 20,
+        duration: `${Math.floor(elapsed / 60).toString().padStart(2, '0')}:${(elapsed % 60).toString().padStart(2, '0')}`,
+        remainingTime: null,
+        engagementLevel: 'high',
+        perStudent: [
+          {
+            deviceId: 'dev123',
+            studentName: 'Student A',
+            attention: Math.floor(Math.random() * 20) + 70,
+          }
+        ]
+      }
+    };
+
+    this.pusherService.trigger(`session_${sessionId}`, 'attention_update', payload);
   }
 
   broadcastAlert(sessionId: string, message: string) {
