@@ -89,15 +89,15 @@ describe('DashboardService', () => {
       (sessionsService.countByUser as jest.Mock).mockResolvedValue(0);
       (devicesService.countByUser as jest.Mock).mockResolvedValue(0);
 
-      await service.getStats('user-123');
+      await service.getStats('507f1f77bcf86cd799439012');
 
-      expect(sessionsService.countByUser).toHaveBeenCalledWith('user-123');
+      expect(sessionsService.countByUser).toHaveBeenCalledWith('507f1f77bcf86cd799439012');
       expect(sessionsService.countByUser).toHaveBeenCalledWith(
-        'user-123',
+        '507f1f77bcf86cd799439012',
         'active',
       );
       expect(devicesService.countByUser).toHaveBeenCalledWith(
-        'user-123',
+        '507f1f77bcf86cd799439012',
         'connected',
       );
     });
